@@ -3,19 +3,11 @@ pragma solidity ^0.8.24;
 
 contract TradingBotManager {
 
-    /*//////////////////////////////////////////////////////////////
-                                TYPES
-    //////////////////////////////////////////////////////////////*/
-
     struct Bot {
         address owner;
-        uint256 balance;
+        uint96 balance;
         bool active;
     }
-
-    /*//////////////////////////////////////////////////////////////
-                               STORAGE
-    //////////////////////////////////////////////////////////////*/
 
     uint256 public botCount;
 
@@ -31,21 +23,12 @@ contract TradingBotManager {
 
     uint256 public totalFunds;
 
-    /*//////////////////////////////////////////////////////////////
-                           REENTRANCY GUARD
-    //////////////////////////////////////////////////////////////*/
-
     uint256 private constant NOT_ENTERED = 1;
     uint256 private constant ENTERED = 2;
 
     uint256 private status = NOT_ENTERED;
 
-    /*//////////////////////////////////////////////////////////////
-                                EVENTS
-    //////////////////////////////////////////////////////////////*/
-
     event BotCreated(uint256 indexed botId, address indexed owner);
-
     event BotDeactivated(uint256 indexed botId);
 
     event Deposited(
@@ -57,7 +40,7 @@ contract TradingBotManager {
 
     event Withdrawn(
         uint256 indexed botId,
-        address indexed owner,
+        address indexed receiver,
         uint256 amount
     );
 
@@ -67,19 +50,14 @@ contract TradingBotManager {
         uint256 amount
     );
 
-    event OwnershipTransferred(
-        address indexed oldOwner,
-        address indexed newOwner
-    );
+    event BotDebited(uint256 indexed botId, uint256 amount);
+    event BotCredited(uint256 indexed botId, uint256 amount);
 
+    event OwnershipTransferred(address indexed oldOwner, address indexed newOwner);
     event TradeExecutorUpdated(address indexed executor);
 
     event Paused();
     event Unpaused();
-
-    /*//////////////////////////////////////////////////////////////
-                                ERRORS
-    //////////////////////////////////////////////////////////////*/
 
     error BotDoesNotExist();
     error Unauthorized();
@@ -90,18 +68,13 @@ contract TradingBotManager {
     error TransferFailed();
     error Reentrancy();
     error ContractPaused();
-
-    /*//////////////////////////////////////////////////////////////
-                               CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
+    error ExecutorNotSet();
+    error BalanceOverflow();
+    error Insolvent();
 
     constructor() {
         owner = msg.sender;
     }
-
-    /*//////////////////////////////////////////////////////////////
-                               MODIFIERS
-    //////////////////////////////////////////////////////////////*/
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert OwnerOnly();
@@ -109,6 +82,7 @@ contract TradingBotManager {
     }
 
     modifier onlyExecutor() {
+        if (tradeExecutor == address(0)) revert ExecutorNotSet();
         if (msg.sender != tradeExecutor) revert Unauthorized();
         _;
     }
@@ -130,7 +104,6 @@ contract TradingBotManager {
 
     modifier nonReentrant() {
         if (status == ENTERED) revert Reentrancy();
-
         status = ENTERED;
         _;
         status = NOT_ENTERED;
@@ -140,10 +113,6 @@ contract TradingBotManager {
         if (paused) revert ContractPaused();
         _;
     }
-
-    /*//////////////////////////////////////////////////////////////
-                            OWNERSHIP
-    //////////////////////////////////////////////////////////////*/
 
     function transferOwnership(address newOwner) external onlyOwner {
         if (newOwner == address(0)) revert Unauthorized();
@@ -155,13 +124,12 @@ contract TradingBotManager {
     }
 
     function setTradeExecutor(address executor) external onlyOwner {
+        if (executor == address(0)) revert Unauthorized();
+
         tradeExecutor = executor;
+
         emit TradeExecutorUpdated(executor);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                            BOT MANAGEMENT
-    //////////////////////////////////////////////////////////////*/
 
     function createBot()
         external
@@ -170,10 +138,11 @@ contract TradingBotManager {
     {
         botId = botCount;
 
-        Bot storage bot = bots[botId];
-
-        bot.owner = msg.sender;
-        bot.active = true;
+        bots[botId] = Bot({
+            owner: msg.sender,
+            balance: 0,
+            active: true
+        });
 
         userBots[msg.sender].push(botId);
 
@@ -193,15 +162,12 @@ contract TradingBotManager {
         Bot storage bot = bots[botId];
 
         if (!bot.active) revert BotAlreadyInactive();
+        if (bot.balance != 0) revert InvalidAmount();
 
         bot.active = false;
 
         emit BotDeactivated(botId);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                                DEPOSITS
-    //////////////////////////////////////////////////////////////*/
 
     function deposit(uint256 botId)
         external
@@ -217,18 +183,16 @@ contract TradingBotManager {
 
         Bot storage bot = bots[botId];
 
-        unchecked {
-            bot.balance += amount;
-        }
+        uint256 newBalance = bot.balance + amount;
+
+        if (newBalance > type(uint96).max) revert BalanceOverflow();
+
+        bot.balance = uint96(newBalance);
 
         totalFunds += amount;
 
-        emit Deposited(botId, msg.sender, amount, bot.balance);
+        emit Deposited(botId, msg.sender, amount, newBalance);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                                WITHDRAW
-    //////////////////////////////////////////////////////////////*/
 
     function withdraw(uint256 botId)
         external
@@ -246,7 +210,7 @@ contract TradingBotManager {
 
         totalFunds -= amount;
 
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        (bool success,) = payable(msg.sender).call{value: amount}("");
 
         if (!success) revert TransferFailed();
 
@@ -271,16 +235,12 @@ contract TradingBotManager {
 
         totalFunds -= amount;
 
-        (bool success, ) = payable(to).call{value: amount}("");
+        (bool success,) = payable(to).call{value: amount}("");
 
         if (!success) revert TransferFailed();
 
         emit Withdrawn(botId, to, amount);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                        EMERGENCY FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
 
     function emergencyWithdraw(uint256 botId)
         external
@@ -299,16 +259,12 @@ contract TradingBotManager {
 
         totalFunds -= amount;
 
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        (bool success,) = payable(msg.sender).call{value: amount}("");
 
         if (!success) revert TransferFailed();
 
         emit EmergencyWithdraw(botId, msg.sender, amount);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                        EXECUTOR FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
 
     function debitBot(uint256 botId, uint256 amount)
         external
@@ -320,32 +276,35 @@ contract TradingBotManager {
         if (!bot.active) revert BotInactive();
         if (bot.balance < amount) revert InvalidAmount();
 
-        unchecked {
-            bot.balance -= amount;
-        }
+        bot.balance -= uint96(amount);
 
         totalFunds -= amount;
+
+        emit BotDebited(botId, amount);
     }
 
-    function creditBot(uint256 botId, uint256 amount)
+    function creditBot(uint256 botId)
         external
+        payable
         onlyExecutor
         botExists(botId)
     {
+        uint256 amount = msg.value;
+
+        if (amount == 0) revert InvalidAmount();
+
         Bot storage bot = bots[botId];
 
-        if (!bot.active) revert BotInactive();
+        uint256 newBalance = bot.balance + amount;
 
-        unchecked {
-            bot.balance += amount;
-        }
+        if (newBalance > type(uint96).max) revert BalanceOverflow();
+
+        bot.balance = uint96(newBalance);
 
         totalFunds += amount;
-    }
 
-    /*//////////////////////////////////////////////////////////////
-                            PAUSE SYSTEM
-    //////////////////////////////////////////////////////////////*/
+        emit BotCredited(botId, amount);
+    }
 
     function pause() external onlyOwner {
         paused = true;
@@ -357,10 +316,6 @@ contract TradingBotManager {
         emit Unpaused();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                                VIEWS
-    //////////////////////////////////////////////////////////////*/
-
     function getUserBots(address user)
         external
         view
@@ -369,31 +324,9 @@ contract TradingBotManager {
         return userBots[user];
     }
 
-    function getBot(uint256 botId)
-        external
-        view
-        botExists(botId)
-        returns (Bot memory)
-    {
-        return bots[botId];
+    function isSolvent() external view returns (bool) {
+        return address(this).balance >= totalFunds;
     }
-
-    function balanceOfBot(uint256 botId)
-        external
-        view
-        botExists(botId)
-        returns (uint256)
-    {
-        return bots[botId].balance;
-    }
-
-    function totalLocked() external view returns (uint256) {
-        return totalFunds;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                                RECEIVE
-    //////////////////////////////////////////////////////////////*/
 
     receive() external payable {
         revert();
