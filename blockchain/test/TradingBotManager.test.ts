@@ -455,6 +455,14 @@ describe("TradingBotManager", function () {
       // withdraw does NOT have whenNotPaused modifier — should succeed
       await expect(contract.connect(user1).withdraw(0)).not.to.be.reverted;
     });
+
+    it("reverts with TransferFailed when recipient rejects ETH", async function () {
+      const { contract } = await loadFixture(deployWithExecutorFixture);
+      const RejectHelper = await ethers.getContractFactory("RejectEtherHelper");
+      const helper = await RejectHelper.deploy(await contract.getAddress());
+      await helper.createAndFund({ value: ethers.parseEther("1") });
+      await expect(helper.doWithdraw()).to.be.revertedWithCustomError(contract, "TransferFailed");
+    });
   });
 
   // ─────────────────────────────────────────────
@@ -496,6 +504,37 @@ describe("TradingBotManager", function () {
       await expect(
         contract.connect(user1).withdrawTo(0, user2.address)
       ).to.be.revertedWithCustomError(contract, "InvalidAmount");
+    });
+
+    it("reverts if bot does not exist", async function () {
+      const { contract, user1, user2 } = await loadFixture(deployWithFundedBotFixture);
+      await expect(
+        contract.connect(user1).withdrawTo(99, user2.address)
+      ).to.be.revertedWithCustomError(contract, "BotDoesNotExist");
+    });
+
+    it("reverts with TransferFailed when recipient rejects ETH", async function () {
+      const { contract, user1 } = await loadFixture(deployWithFundedBotFixture);
+      const RejectHelper = await ethers.getContractFactory("RejectEtherHelper");
+      const helper = await RejectHelper.deploy(await contract.getAddress());
+      await expect(
+        contract.connect(user1).withdrawTo(0, await helper.getAddress())
+      ).to.be.revertedWithCustomError(contract, "TransferFailed");
+    });
+
+    it("prevents reentrancy attack via withdrawTo", async function () {
+      const { contract } = await loadFixture(deployWithExecutorFixture);
+      const AttackerFactory = await ethers.getContractFactory("ReentrancyAttackerWithdrawTo");
+      const attacker = await AttackerFactory.deploy(await contract.getAddress());
+      const depositAmount = ethers.parseEther("1");
+      await attacker.createBot({ value: depositAmount });
+      const attackerAddress = await attacker.getAddress();
+      const balanceBefore = await ethers.provider.getBalance(attackerAddress);
+      await attacker.attack();
+      const balanceAfter = await ethers.provider.getBalance(attackerAddress);
+      expect(balanceAfter - balanceBefore).to.equal(depositAmount);
+      const bot = await contract.bots(0);
+      expect(bot.balance).to.equal(0);
     });
   });
 
@@ -552,6 +591,29 @@ describe("TradingBotManager", function () {
       const { contract, owner, user1 } = await loadFixture(deployWithFundedBotFixture);
       await contract.connect(owner).pause();
       await expect(contract.connect(user1).emergencyWithdraw(0)).not.to.be.reverted;
+    });
+
+    it("reverts with TransferFailed when recipient rejects ETH", async function () {
+      const { contract } = await loadFixture(deployWithExecutorFixture);
+      const RejectHelper = await ethers.getContractFactory("RejectEtherHelper");
+      const helper = await RejectHelper.deploy(await contract.getAddress());
+      await helper.createAndFund({ value: ethers.parseEther("1") });
+      await expect(helper.doEmergencyWithdraw()).to.be.revertedWithCustomError(contract, "TransferFailed");
+    });
+
+    it("prevents reentrancy attack via emergencyWithdraw", async function () {
+      const { contract } = await loadFixture(deployWithExecutorFixture);
+      const AttackerFactory = await ethers.getContractFactory("ReentrancyAttackerEmergencyWithdraw");
+      const attacker = await AttackerFactory.deploy(await contract.getAddress());
+      const depositAmount = ethers.parseEther("1");
+      await attacker.createBot({ value: depositAmount });
+      const attackerAddress = await attacker.getAddress();
+      const balanceBefore = await ethers.provider.getBalance(attackerAddress);
+      await attacker.attack();
+      const balanceAfter = await ethers.provider.getBalance(attackerAddress);
+      expect(balanceAfter - balanceBefore).to.equal(depositAmount);
+      const bot = await contract.bots(0);
+      expect(bot.balance).to.equal(0);
     });
   });
 
@@ -773,6 +835,17 @@ describe("TradingBotManager", function () {
       // Bot balance must now be 0 (only one withdrawal happened)
       const bot = await contract.bots(0);
       expect(bot.balance).to.equal(0);
+    });
+
+    it("attacker can receive ETH outside of attack (receive else branch)", async function () {
+      const AttackerFactory = await ethers.getContractFactory("ReentrancyAttackerBotManager");
+      const { contract, user1 } = await loadFixture(deployWithExecutorFixture);
+      const attacker = await AttackerFactory.deploy(await contract.getAddress());
+      // Send ETH directly to the attacker when attacking == false
+      // This exercises the else branch of the receive() function
+      await expect(
+        user1.sendTransaction({ to: await attacker.getAddress(), value: ethers.parseEther("0.1") })
+      ).not.to.be.reverted;
     });
   });
 });
