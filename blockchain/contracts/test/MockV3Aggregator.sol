@@ -1,0 +1,28 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+contract MockV3Aggregator {
+    int256 private mockPrice;
+
+    constructor(int256 _mockPrice) {
+        mockPrice = _mockPrice;
+    }
+
+    function updateAnswer(int256 _answer) external {
+        mockPrice = _answer;
+    }
+
+    function latestRoundData()
+        external
+        view
+        returns (
+            uint80 roundId,
+            int256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        )
+    {
+        return (1, mockPrice, block.timestamp, block.timestamp, 1);
+    }
+}
