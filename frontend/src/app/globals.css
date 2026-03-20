@@ -13,22 +13,23 @@
 }
 
 :root {
-  --background: #050505;
-  --foreground: #ffffff;
-  --primary: #4f46e5;
+  --background: #f8f9fc;
+  --foreground: #0f172a;
+  --primary: #fa52a0;
   --primary-foreground: #ffffff;
-  --accent: #2dd4bf;
-  --card: rgba(20, 20, 30, 0.4);
-  --border: rgba(255, 255, 255, 0.08);
-  --muted: #1f2937;
-  --muted-foreground: #9ca3af;
+  --accent: #6b21a8;
+  --card: rgba(255, 255, 255, 0.7);
+  --border: rgba(0, 0, 0, 0.08);
+  --muted: #e2e8f0;
+  --muted-foreground: #64748b;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  background-image: radial-gradient(circle at 15% 10%, rgba(79, 70, 229, 0.15) 0%, transparent 40%),
-                    radial-gradient(circle at 85% 90%, rgba(45, 212, 191, 0.1) 0%, transparent 40%);
+  background-image: 
+    radial-gradient(circle at 15% 10%, rgba(250, 82, 160, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 85% 90%, rgba(107, 33, 168, 0.06) 0%, transparent 40%);
   background-attachment: fixed;
   font-family: Arial, Helvetica, sans-serif;
   overflow-x: hidden;
@@ -41,4 +42,19 @@ body {
   border: 1px solid var(--border);
   border-radius: 1.5rem;
   box-shadow: 0 4px 40px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-ticker {
+  animation: ticker 40s linear infinite;
+  display: flex;
+  width: max-content;
+}
+
+.animate-ticker:hover {
+  animation-play-state: paused;
 }

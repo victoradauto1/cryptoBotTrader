@@ -19,6 +19,9 @@ export const metadata: Metadata = {
 
 import { AppProviders } from "@/components/providers/WagmiProvider";
 
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,7 +34,11 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <AppProviders>
-          {children}
+          <Header />
+          <div className="flex-1">
+            {children}
+          </div>
+          <Footer />
         </AppProviders>
       </body>
     </html>

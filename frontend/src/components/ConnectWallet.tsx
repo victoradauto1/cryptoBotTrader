@@ -22,18 +22,22 @@ export function ConnectWallet() {
 
   if (isConnected) {
     return (
-      <div className="flex items-center gap-3">
-        <div className="px-4 py-2 bg-card border border-border text-foreground font-medium rounded-full flex items-center gap-2">
+      <div className="relative group">
+        <div className="px-4 py-2 bg-card border border-border text-foreground font-medium rounded-full flex items-center gap-2 cursor-pointer hover:bg-muted transition-colors">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           {address?.slice(0, 6)}...{address?.slice(-4)}
         </div>
-        <button 
-          onClick={() => disconnect()}
-          className="p-2.5 bg-card border border-border text-muted-foreground hover:text-destructive hover:border-destructive transition-all rounded-full flex items-center justify-center"
-          title="Disconnect Wallet"
-        >
-          <LogOut className="w-4 h-4" />
-        </button>
+        
+        {/* Hover Menu */}
+        <div className="absolute right-0 top-full mt-2 w-48 bg-card border border-border rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.1)] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
+          <button 
+            onClick={() => disconnect()}
+            className="w-full px-4 py-3 text-left text-sm font-medium text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+            Disconnect Wallet
+          </button>
+        </div>
       </div>
     );
   }
