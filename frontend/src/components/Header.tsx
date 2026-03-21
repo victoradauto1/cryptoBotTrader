@@ -11,7 +11,9 @@ export default function Header() {
           CryptoBot<span className="text-accent">Trader</span>
         </h1>
       </Link>
-      <nav className="flex items-center gap-6">
+      <nav className="flex items-center gap-6 text-sm font-semibold">
+        <Link href="/all-bots" className="text-muted-foreground hover:text-primary transition-colors hidden sm:block">Explore Bots</Link>
+        <Link href="/create" className="text-muted-foreground hover:text-primary transition-colors hidden sm:block">Create Bot</Link>
         <ConnectWallet />
       </nav>
     </header>

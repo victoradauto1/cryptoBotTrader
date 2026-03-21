@@ -43,10 +43,6 @@ export default function CreateBot() {
 
   return (
     <main className="min-h-screen p-6 md:p-12 max-w-4xl mx-auto flex flex-col gap-8 animate-in fade-in duration-700">
-      <nav className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors w-fit">
-        <Home className="w-4 h-4" />
-        <Link href="/" className="font-medium">Back to Home</Link>
-      </nav>
 
       <header className="flex flex-col gap-2 mb-4">
         <h1 className="text-4xl font-extrabold flex items-center gap-3">
