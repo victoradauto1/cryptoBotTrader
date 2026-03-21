@@ -73,7 +73,7 @@ export default function AllBotsPage() {
         </div>
         <input
           type="text"
-          placeholder="Search by wallet address or performance (e.g. 42%)..."
+          placeholder="Search by bot name, wallet address, or performance..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full bg-card border border-border rounded-2xl pl-12 pr-4 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-sm hover:shadow-md transition-all text-lg"
