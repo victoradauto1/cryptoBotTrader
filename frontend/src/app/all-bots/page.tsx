@@ -57,9 +57,9 @@ export default function AllBotsPage() {
 
   return (
     <main className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto flex flex-col gap-8 animate-in fade-in duration-700">
-      <header className="flex flex-col gap-2 mb-2 text-center md:text-left">
-        <h1 className="text-4xl font-extrabold flex items-center justify-center md:justify-start gap-3 text-foreground">
-          <Bot className="w-10 h-10 text-primary" /> Explore All Bots
+      <header className="flex flex-col gap-2 mb-2 text-center">
+        <h1 className="text-4xl font-extrabold text-foreground">
+          Explore All Bots
         </h1>
         <p className="text-muted-foreground text-lg">
           Discover, analyze, and track decentralized trading bots running on-chain.
@@ -67,7 +67,7 @@ export default function AllBotsPage() {
       </header>
 
       {/* SEARCH BAR */}
-      <div className="w-full relative max-w-2xl mx-auto md:mx-0">
+      <div className="w-full relative max-w-2xl mx-auto">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
           <Search className="h-5 w-5 text-muted-foreground" />
         </div>

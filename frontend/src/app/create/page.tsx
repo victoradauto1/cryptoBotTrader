@@ -44,9 +44,9 @@ export default function CreateBot() {
   return (
     <main className="min-h-screen p-6 md:p-12 max-w-4xl mx-auto flex flex-col gap-8 animate-in fade-in duration-700">
 
-      <header className="flex flex-col gap-2 mb-4">
-        <h1 className="text-4xl font-extrabold flex items-center gap-3">
-          <Bot className="w-10 h-10 text-primary" /> Create New Bot
+      <header className="flex flex-col gap-2 mb-4 text-center">
+        <h1 className="text-4xl font-extrabold">
+          Create New Bot
         </h1>
         <p className="text-muted-foreground text-lg">Define your strategy parameters and save them immutably to IPFS.</p>
       </header>
