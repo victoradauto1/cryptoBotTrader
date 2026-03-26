@@ -20,11 +20,15 @@ export const config = createConfig({
 
 const queryClient = new QueryClient();
 
+import { CryptoBotProvider } from './CryptoBotContext';
+
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <WagmiConfig config={config}>
       <QueryClientProvider client={queryClient}>
-        {children}
+        <CryptoBotProvider>
+          {children}
+        </CryptoBotProvider>
       </QueryClientProvider>
     </WagmiConfig>
   );
