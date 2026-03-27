@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useCryptoBot } from "@/components/providers/CryptoBotContext";
 import { Bot, UploadCloud, ArrowRight, Loader2, Home } from "lucide-react";
 import Link from "next/link";
 
@@ -10,9 +11,12 @@ export default function CreateBot() {
   const [strategy, setStrategy] = useState("Mean Reversion");
   const [isUploading, setIsUploading] = useState(false);
   const [cid, setCid] = useState("");
+  
+  const { isConnected, hasActiveSubscription } = useCryptoBot();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
     setIsUploading(true);
     setCid("");
 
@@ -52,15 +56,29 @@ export default function CreateBot() {
       </header>
 
       <form onSubmit={handleCreate} className="glass-panel p-8 flex flex-col gap-6">
+        
+        {mounted && !isConnected && (
+          <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 p-4 rounded-xl text-center font-medium">
+            Please connect your wallet to create a bot.
+          </div>
+        )}
+
+        {mounted && isConnected && !hasActiveSubscription && (
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl text-center font-medium">
+            You need an active PRO subscription to deploy a bot.
+          </div>
+        )}
+
         <div className="flex flex-col gap-2">
           <label className="font-semibold text-foreground">Bot Name</label>
           <input 
             type="text" 
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full bg-black/50 border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+            className="w-full bg-black/50 border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all disabled:opacity-50"
             placeholder="e.g. ETH Alpha Scalper"
             required
+            disabled={!mounted || !isConnected || !hasActiveSubscription}
           />
         </div>
 
@@ -69,9 +87,10 @@ export default function CreateBot() {
           <textarea 
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full bg-black/50 border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all min-h-[100px]"
+            className="w-full bg-black/50 border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all min-h-[100px] disabled:opacity-50"
             placeholder="Describe the bot's strategy and risk profile..."
             required
+            disabled={!mounted || !isConnected || !hasActiveSubscription}
           />
         </div>
 
@@ -80,7 +99,8 @@ export default function CreateBot() {
           <select 
             value={strategy}
             onChange={(e) => setStrategy(e.target.value)}
-            className="w-full bg-black/50 border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all appearance-none"
+            className="w-full bg-black/50 border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all appearance-none disabled:opacity-50"
+            disabled={!mounted || !isConnected || !hasActiveSubscription}
           >
             <option value="Mean Reversion">Mean Reversion</option>
             <option value="Trend Following">Trend Following</option>
@@ -91,7 +111,7 @@ export default function CreateBot() {
 
         <button 
           type="submit" 
-          disabled={isUploading}
+          disabled={isUploading || !mounted || !isConnected || !hasActiveSubscription}
           className="mt-4 px-8 py-4 bg-primary text-primary-foreground font-bold rounded-xl hover:opacity-90 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed text-lg"
         >
           {isUploading ? (
