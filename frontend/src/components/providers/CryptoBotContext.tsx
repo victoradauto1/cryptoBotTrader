@@ -23,7 +23,7 @@ const CryptoBotContext = createContext<CryptoBotState>({
 export function CryptoBotProvider({ children }: { children: ReactNode }) {
   const { address, isConnected } = useConnection();
 
-  // Lê o saldo atual de TRD Token da carteira logada
+  // Read current TRD Token balance from the connected wallet
   const { data: balanceData } = useReadContract({
     address: CONTRACT_ADDRESSES.TraderToken,
     abi: traderTokenAbi,
@@ -34,7 +34,7 @@ export function CryptoBotProvider({ children }: { children: ReactNode }) {
     }
   });
 
-  // Consulta se a carteira tem uma assinatura ativa na plataforma
+  // Check if the wallet has an active platform subscription
   const { data: subData } = useReadContract({
     address: CONTRACT_ADDRESSES.Platform,
     abi: platformAbi,
@@ -57,7 +57,7 @@ export function CryptoBotProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Hook Global super simples para instanciar as leituras onde você quiser no front
+// Simple global hook to instantiate reads across the frontend
 export function useCryptoBot() {
   return useContext(CryptoBotContext);
 }

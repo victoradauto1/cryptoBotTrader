@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-// Interface mínima para interação com o Cofre
+// Minimal interface for interaction with the Vault
 interface ITradingBotManager {
     function debitBot(uint256 botId, uint256 amount) external;
     function creditBot(uint256 botId) external payable;
@@ -15,9 +15,8 @@ contract TradeExecutor is Ownable {
     ITradingBotManager public botManager;
     AggregatorV3Interface public priceFeed;
     
-    // Taxas de Lucro e Perda (em porcentagem simples para a simulação)
-    uint256 public rewardPercentage = 5; // Lucro de 5% sobre a banca apostada
-    uint256 public lossPercentage = 5;   // Perda de 5% sobre a banca apostada
+    uint256 public rewardPercentage = 5;
+    uint256 public lossPercentage = 5;
     
     event TradeExecuted(uint256 indexed botId, int256 currentPrice, bool isWin, uint256 impactAmount);
     event AddressesUpdated(address botManager, address priceFeed);
@@ -44,7 +43,7 @@ contract TradeExecutor is Ownable {
     }
 
     /**
-     * @dev Consulta a cotação mais recente do provedor de dados oracle (Chainlink ETH/USD)
+     * @dev Fetches the latest price from the oracle data provider (Chainlink ETH/USD)
      */
     function getLatestPrice() public view returns (int256) {
         (
@@ -58,12 +57,11 @@ contract TradeExecutor is Ownable {
     }
 
     /**
-     * @dev Simulação da execução de um trade utilizando dados de mercado.
-     * Na prática, uma automação chamaria isso avaliando indicadores técnicos.
-     * @param botId O ID do bot executando o trade.
-     * @param tradeAmount O tamanho da posição (banca arriscada).
-     * @param direction Aposta: true = LONG (espera subir), false = SHORT (espera cair).
-     * @param referencePrice O preço do momento que o bot entrou no trade.
+     * @dev Simulates a trade execution using market data.
+     * @param botId The ID of the bot executing the trade.
+     * @param tradeAmount Position size (risked balance).
+     * @param direction Trade direction: true = LONG, false = SHORT.
+     * @param referencePrice The market price when the bot entered the trade.
      */
     function executeSimulatedTrade(
         uint256 botId, 
@@ -71,35 +69,27 @@ contract TradeExecutor is Ownable {
         bool direction, 
         int256 referencePrice
     ) external onlyOwner {
-        // Validação da titularidade e capacidade do bot
         (, uint96 balance, bool active) = botManager.bots(botId);
         if (!active || balance < tradeAmount || tradeAmount == 0) revert InvalidBot();
 
-        // Extrai o preço do ativo em tempo real
         int256 currentPrice = getLatestPrice();
         if (currentPrice <= 0) revert InvalidPrice();
 
-        // Lógica de mercado otimizada:
-        // LONG (true) vence se o Preço Atual > Preço de Entrada
-        // SHORT (false) vence se o Preço Atual < Preço de Entrada
+        // Market logic: LONG (true) wins if Current Price > Entry Price, SHORT (false) wins otherwise
         bool isWin = direction ? (currentPrice > referencePrice) : (currentPrice < referencePrice);
 
-        // Resolução Financeira no TradingBotManager
         if (isWin) {
             uint256 profit = (tradeAmount * rewardPercentage) / 100;
             
-            // O executor (nós) precisa ter ETH suficiente no contrato para pagar os lucros
+            // The executor must have enough ETH to pay profits
             if (address(this).balance < profit) revert InsufficientExecutorBalance();
             
-            // Credita o bot via payable com fundos próprios do executor (Liquidez das taxas)
             botManager.creditBot{value: profit}(botId);
             
             emit TradeExecuted(botId, currentPrice, true, profit);
         } else {
             uint256 loss = (tradeAmount * lossPercentage) / 100;
             
-            // Debita a perda do controle do bot. O TradingBotManager guarda o saldo,
-            // que fisicamente fica "solto" no cofre por enquanto.
             botManager.debitBot(botId, loss);
             
             emit TradeExecuted(botId, currentPrice, false, loss);
@@ -107,15 +97,15 @@ contract TradeExecutor is Ownable {
     }
 
     /**
-     * @dev Permite injeção de liquidez no executor para que ele possa pagar vencimentos.
+     * @dev Allows liquidity injection into the executor to pay for winnings.
      */
     receive() external payable {}
     
     /**
-     * @dev Permite ao Owner retirar a liquidez do pool do executor se necessário.
+     * @dev Allows the Owner to withdraw liquidity from the executor pool if necessary.
      */
     function withdrawLiquidity(uint256 amount) external onlyOwner {
-        require(address(this).balance >= amount, "Saldo insuficiente");
+        require(address(this).balance >= amount, "Insufficient balance");
         payable(owner()).transfer(amount);
     }
 }

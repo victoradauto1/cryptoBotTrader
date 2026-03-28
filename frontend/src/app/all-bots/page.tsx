@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Search, Bot, Activity, Calendar, Hash, ArrowUpRight } from "lucide-react";
 
-// Mock data para exibição de Frontend
+// Frontend mock data
 const MOCK_BOTS = [
   {
     id: "1",

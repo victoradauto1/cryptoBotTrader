@@ -60,7 +60,7 @@ contract Platform is Ownable {
         emit SubscriptionPaid(msg.sender, subscriptionFee);
     }
 
-    // --- Controles de Orquestração do Bot Manager ---
+    // --- Bot Manager Orchestration Controls ---
 
     function updateBotManagerExecutor(address _newExecutor) external onlyOwner {
         botManager.setTradeExecutor(_newExecutor);
@@ -74,7 +74,7 @@ contract Platform is Ownable {
         botManager.unpause();
     }
     
-    // --- Saque de Taxas Arrecadadas ---
+    // --- Collected Fees Withdrawal ---
 
     function withdrawFees() external onlyOwner {
         uint256 balance = traderToken.balanceOf(address(this));

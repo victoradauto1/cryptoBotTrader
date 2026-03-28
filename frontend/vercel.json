@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/bot-worker",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
