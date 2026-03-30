@@ -5,6 +5,7 @@ contract TradingBotManager {
 
     struct Bot {
         address owner;
+        string configCid;
         uint96 balance;
         bool active;
     }
@@ -131,7 +132,7 @@ contract TradingBotManager {
         emit TradeExecutorUpdated(executor);
     }
 
-    function createBot()
+    function createBot(string calldata cid)
         external
         whenNotPaused
         returns (uint256 botId)
@@ -140,6 +141,7 @@ contract TradingBotManager {
 
         bots[botId] = Bot({
             owner: msg.sender,
+            configCid: cid,
             balance: 0,
             active: true
         });

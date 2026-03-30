@@ -19,17 +19,14 @@ export async function GET(request: Request) {
       process.env.CRON_SECRET && 
       authHeader !== `Bearer ${process.env.CRON_SECRET}`
     ) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const privateKey = process.env.ADMIN_PRIVATE_KEY;
-    const executorAddress = process.env.NEXT_PUBLIC_TRADE_EXECUTOR_ADDRESS as `0x${string}`;
+    const executorAddress = CONTRACT_ADDRESSES.TradeExecutor;
 
     if (!privateKey || !privateKey.startsWith('0x')) {
-      return NextResponse.json({ error: 'ADMIN_PRIVATE_KEY ausente ou inválida' }, { status: 500 });
-    }
-    if (!executorAddress) {
-      return NextResponse.json({ error: 'NEXT_PUBLIC_TRADE_EXECUTOR_ADDRESS ausente no .env' }, { status: 500 });
+      return NextResponse.json({ error: 'ADMIN_PRIVATE_KEY missing or invalid' }, { status: 500 });
     }
 
     // 3. Client Configuration (RPC)
@@ -51,7 +48,7 @@ export async function GET(request: Request) {
     }) as bigint;
 
     if (botCount === BigInt(0)) {
-      return NextResponse.json({ message: 'Nenhum bot cadastrado' });
+      return NextResponse.json({ message: 'No registered bots found' });
     }
 
     // 5. Current Oracle Price for realistic simulation ($3000 initial fallback)
@@ -63,7 +60,7 @@ export async function GET(request: Request) {
         functionName: 'getLatestPrice',
       }) as bigint;
     } catch (e) {
-      console.warn("Aviso: Falha ao ler oráculo. Utilizando preço fixo para simulação.", e);
+      console.warn("Warning: Failed to read oracle. Using fixed price for simulation.", e);
     }
 
     const executedBots: number[] = [];
@@ -76,9 +73,9 @@ export async function GET(request: Request) {
                 abi: botManagerAbi,
                 functionName: 'bots',
                 args: [BigInt(i)],
-            }) as [string, bigint, boolean];
+            }) as [string, string, bigint, boolean];
 
-            const [, balance, active] = botInfo;
+            const [, , balance, active] = botInfo;
 
             // Skip deactivated bots or those with no balance
             if (!active || balance === BigInt(0)) continue;
@@ -107,8 +104,8 @@ export async function GET(request: Request) {
             executedBots.push(i);
 
         } catch (botError: any) {
-            console.error(`Erro Bot #${i}:`, botError.shortMessage || botError.message);
-            errors.push(`Bot #${i}: ${botError.shortMessage || 'Erro desconhecido'}`);
+            console.error(`Error Bot #${i}:`, botError.shortMessage || botError.message);
+            errors.push(`Bot #${i}: ${botError.shortMessage || 'Unknown error'}`);
         }
     }
 

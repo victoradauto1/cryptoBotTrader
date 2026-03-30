@@ -8,7 +8,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 interface ITradingBotManager {
     function debitBot(uint256 botId, uint256 amount) external;
     function creditBot(uint256 botId) external payable;
-    function bots(uint256 botId) external view returns (address owner, uint96 balance, bool active);
+    function bots(uint256 botId) external view returns (address owner, string memory configCid, uint96 balance, bool active);
 }
 
 contract TradeExecutor is Ownable {
@@ -69,7 +69,7 @@ contract TradeExecutor is Ownable {
         bool direction, 
         int256 referencePrice
     ) external onlyOwner {
-        (, uint96 balance, bool active) = botManager.bots(botId);
+        (, , uint96 balance, bool active) = botManager.bots(botId);
         if (!active || balance < tradeAmount || tradeAmount == 0) revert InvalidBot();
 
         int256 currentPrice = getLatestPrice();
