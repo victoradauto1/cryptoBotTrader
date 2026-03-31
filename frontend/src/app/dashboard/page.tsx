@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Activity, Play, Pause, Settings, ExternalLink, Home, Loader2 } from "lucide-react";
+import { Activity, ExternalLink, Home, Loader2, Wallet, ArrowDownToLine, ArrowUpFromLine, PowerOff, X } from "lucide-react";
 import Link from "next/link";
-import { useConnection } from "wagmi";
+import { useConnection, useWriteContract } from "wagmi";
+import { parseEther, formatEther } from "viem";
 import { publicClient, CONTRACT_ADDRESSES } from "@/utils/constants";
 import TradingBotManagerABI from "@/abi/TradingBotManager.json";
 
@@ -15,71 +16,141 @@ interface BotData {
   status: string;
   cid: string;
   balance: string;
+  rawBalance: bigint;
 }
 
 export default function Dashboard() {
   const { address } = useConnection();
+  const { writeContractAsync } = useWriteContract();
+  
   const [userBots, setUserBots] = useState<BotData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  // Modal / Interaction states
+  const [selectedBotForDeposit, setSelectedBotForDeposit] = useState<number | null>(null);
+  const [depositAmount, setDepositAmount] = useState<string>("");
+  const [isTxPending, setIsTxPending] = useState(false);
 
-  useEffect(() => {
-    async function loadBots() {
-      if (!address) {
-        setUserBots([]);
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
-      try {
-        const botIds = await publicClient.readContract({
+  const fetchBots = async () => {
+    if (!address) {
+      setUserBots([]);
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const botIds = await publicClient.readContract({
+        address: CONTRACT_ADDRESSES.TradingBotManager,
+        abi: TradingBotManagerABI,
+        functionName: "getUserBots",
+        args: [address],
+      }) as bigint[];
+
+      const botsData = [];
+      for (const id of botIds) {
+        const botInfo: any = await publicClient.readContract({
           address: CONTRACT_ADDRESSES.TradingBotManager,
           abi: TradingBotManagerABI,
-          functionName: "getUserBots",
-          args: [address],
-        }) as bigint[];
-
-        const botsData = [];
-        for (const id of botIds) {
-          const botInfo: any = await publicClient.readContract({
-            address: CONTRACT_ADDRESSES.TradingBotManager,
-            abi: TradingBotManagerABI,
-            functionName: "bots",
-            args: [id],
-          });
-          
-          const [owner, configCid, balance, active] = botInfo;
-          
-          let metadata = { name: `Bot #${id.toString()}`, strategy: "UnknownStrategy" };
-          if (configCid) {
-            try {
-              const res = await fetch(`https://gateway.pinata.cloud/ipfs/${configCid}`);
-              if (res.ok) {
-                metadata = await res.json();
-              }
-            } catch (e) {
-              console.error("Failed to fetch IPFS:", e);
+          functionName: "bots",
+          args: [id],
+        });
+        
+        const [owner, configCid, balance, active] = botInfo;
+        
+        let metadata = { name: `Bot #${id.toString()}`, strategy: "UnknownStrategy" };
+        if (configCid) {
+          try {
+            const res = await fetch(`https://gateway.pinata.cloud/ipfs/${configCid}`);
+            if (res.ok) {
+              metadata = await res.json();
             }
+          } catch (e) {
+            console.error("Failed to fetch IPFS:", e);
           }
-
-          botsData.push({
-            id: Number(id),
-            name: metadata.name || `Bot #${id.toString()}`,
-            strategy: metadata.strategy || "Unknown",
-            apy: "N/A", 
-            status: active ? "Active" : "Paused",
-            cid: configCid,
-            balance: balance.toString()
-          });
         }
-        setUserBots(botsData);
-      } catch (e) {
-        console.error("Failed to load user bots:", e);
-      } finally {
-        setIsLoading(false);
+
+        botsData.push({
+          id: Number(id),
+          name: metadata.name || `Bot #${id.toString()}`,
+          strategy: metadata.strategy || "Unknown",
+          apy: "N/A", 
+          status: active ? "Active" : "Deactivated",
+          cid: configCid,
+          balance: formatEther(balance),
+          rawBalance: balance
+        });
       }
+      setUserBots(botsData);
+    } catch (e) {
+      console.error("Failed to load user bots:", e);
+    } finally {
+      setIsLoading(false);
     }
-    loadBots();
-  }, [address]);
+  };
+
+  useEffect(() => {
+    fetchBots();
+  }, [address, refreshTrigger]);
+
+  const handleDeposit = async (botId: number) => {
+    if (!depositAmount || isNaN(Number(depositAmount))) return;
+    setIsTxPending(true);
+    try {
+      const hash = await writeContractAsync({
+        address: CONTRACT_ADDRESSES.TradingBotManager,
+        abi: TradingBotManagerABI,
+        functionName: "deposit",
+        args: [BigInt(botId)],
+        value: parseEther(depositAmount)
+      });
+      await publicClient.waitForTransactionReceipt({ hash });
+      setDepositAmount("");
+      setSelectedBotForDeposit(null);
+      setRefreshTrigger(prev => prev + 1);
+    } catch (e) {
+      console.error("Deposit failed", e);
+    } finally {
+      setIsTxPending(false);
+    }
+  };
+
+  const handleWithdraw = async (botId: number) => {
+    setIsTxPending(true);
+    try {
+      const hash = await writeContractAsync({
+        address: CONTRACT_ADDRESSES.TradingBotManager,
+        abi: TradingBotManagerABI,
+        functionName: "withdraw",
+        args: [BigInt(botId)],
+      });
+      await publicClient.waitForTransactionReceipt({ hash });
+      setRefreshTrigger(prev => prev + 1);
+    } catch (e) {
+      console.error("Withdraw failed", e);
+    } finally {
+      setIsTxPending(false);
+    }
+  };
+
+  const handleDeactivate = async (botId: number) => {
+    setIsTxPending(true);
+    try {
+      const hash = await writeContractAsync({
+        address: CONTRACT_ADDRESSES.TradingBotManager,
+        abi: TradingBotManagerABI,
+        functionName: "deactivateBot",
+        args: [BigInt(botId)],
+      });
+      await publicClient.waitForTransactionReceipt({ hash });
+      setRefreshTrigger(prev => prev + 1);
+    } catch (e) {
+      console.error("Deactivate failed", e);
+      alert("Failed to deactivate. Make sure the bot balance is 0 before deactivating.");
+    } finally {
+      setIsTxPending(false);
+    }
+  };
 
   return (
     <main className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto flex flex-col gap-8 animate-in fade-in duration-700">
@@ -117,34 +188,79 @@ export default function Dashboard() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6 pb-20">
           {userBots.map(bot => (
-            <div key={bot.id} className="glass-panel p-6 flex flex-col gap-4">
+            <div key={bot.id} className={`glass-panel p-6 flex flex-col gap-4 relative overflow-hidden ${bot.status === 'Deactivated' ? 'opacity-70 grayscale' : ''}`}>
+              
+              {/* Deposit Overlay */}
+              {selectedBotForDeposit === bot.id && (
+                <div className="absolute inset-0 bg-background/95 backdrop-blur-sm z-10 flex flex-col justify-center items-center p-6 gap-4 animate-in fade-in zoom-in-95 duration-200">
+                  <button onClick={() => setSelectedBotForDeposit(null)} className="absolute top-4 right-4 text-muted-foreground hover:text-white">
+                    <X className="w-5 h-5" />
+                  </button>
+                  <h3 className="font-bold text-lg">Deposit ETH</h3>
+                  <p className="text-sm text-muted-foreground text-center">Enter amount of ETH to fund this bot for trading.</p>
+                  <input 
+                    type="number" 
+                    step="0.001"
+                    placeholder="0.01" 
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    className="w-full bg-black/50 border border-border/50 rounded-lg p-3 text-center text-xl font-mono focus:outline-none focus:border-primary transition-colors"
+                  />
+                  <button 
+                    onClick={() => handleDeposit(bot.id)}
+                    disabled={!depositAmount || isTxPending}
+                    className="w-full py-3 bg-primary text-primary-foreground font-bold rounded-lg hover:opacity-90 transition-all disabled:opacity-50 flex justify-center items-center gap-2"
+                  >
+                    {isTxPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowDownToLine className="w-4 h-4" />}
+                    Confirm Deposit
+                  </button>
+                </div>
+              )}
+
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-xl font-bold truncate max-w-[200px]" title={bot.name}>{bot.name}</h3>
+                  <h3 className="text-xl font-bold truncate max-w-[180px]" title={bot.name}>{bot.name}</h3>
                   <p className="text-sm text-muted-foreground mt-1">{bot.strategy}</p>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-xs font-bold border ${bot.status === 'Active' ? 'bg-accent/10 text-accent border-accent/20' : 'bg-muted text-muted-foreground border-border'}`}>
+                <div className={`px-3 py-1 rounded-full text-xs font-bold border ${bot.status === 'Active' ? 'bg-accent/10 text-accent border-accent/20' : 'bg-destructive/10 text-destructive border-destructive/20'}`}>
                   {bot.status}
                 </div>
               </div>
               
-              <div className="py-4 border-y border-border/50 flex flex-col gap-1">
-                <span className="text-sm text-muted-foreground">Est. APY</span>
-                <span className="text-3xl font-bold text-green-400">{bot.apy}</span>
+              <div className="py-2 flex flex-col gap-1">
+                <span className="text-sm text-muted-foreground flex items-center gap-1"><Wallet className="w-3 h-3"/> Allocated Balance</span>
+                <span className="text-2xl font-mono font-bold">{Number(bot.balance).toFixed(4)} ETH</span>
               </div>
 
-              <div className="flex justify-between items-center mt-2">
+              <div className="flex gap-2 w-full mt-2">
+                <button 
+                  disabled={bot.status === 'Deactivated' || isTxPending}
+                  onClick={() => setSelectedBotForDeposit(bot.id)}
+                  className="flex-1 py-2 bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-50 border border-accent/20 text-sm font-bold rounded-lg transition-all flex justify-center items-center gap-1"
+                >
+                  <ArrowDownToLine className="w-3 h-3" /> Deposit
+                </button>
+                <button 
+                  disabled={bot.rawBalance === BigInt(0) || isTxPending}
+                  onClick={() => handleWithdraw(bot.id)}
+                  className="flex-1 py-2 bg-secondary/50 text-secondary-foreground hover:bg-secondary disabled:opacity-50 border border-border text-sm font-bold rounded-lg transition-all flex justify-center items-center gap-1"
+                >
+                  <ArrowUpFromLine className="w-3 h-3" /> Withdraw
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center mt-2 pt-4 border-t border-border/50">
                  <a href={`https://gateway.pinata.cloud/ipfs/${bot.cid}`} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:text-white flex items-center gap-1 transition-colors">
                    IPFS Config <ExternalLink className="w-3 h-3" />
                  </a>
-                 <div className="flex gap-2">
-                   <button className="p-2 bg-card border border-border rounded-lg hover:bg-white/5 transition-all">
-                     <Settings className="w-4 h-4" />
-                   </button>
-                   <button className="p-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all shadow-[0_0_10px_rgba(79,70,229,0.3)]">
-                     {bot.status === 'Active' ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                   </button>
-                 </div>
+                 <button 
+                   disabled={bot.status === 'Deactivated' || bot.rawBalance > BigInt(0) || isTxPending}
+                   onClick={() => handleDeactivate(bot.id)}
+                   title={bot.rawBalance > BigInt(0) ? "Withdraw funds first to deactivate" : "Deactivate bot"}
+                   className="p-2 bg-destructive/20 text-destructive border border-destructive/20 rounded-lg hover:bg-destructive hover:text-destructive-foreground disabled:opacity-30 disabled:hover:bg-destructive/20 disabled:hover:text-destructive transition-all"
+                 >
+                   <PowerOff className="w-4 h-4" />
+                 </button>
               </div>
             </div>
           ))}

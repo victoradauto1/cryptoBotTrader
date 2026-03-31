@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useCryptoBot } from "@/components/providers/CryptoBotContext";
-import { Bot, UploadCloud, ArrowRight, Loader2, Home } from "lucide-react";
+import { Bot, UploadCloud, ArrowRight, Loader2, Home, CheckCircle } from "lucide-react";
 import Link from "next/link";
+import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { CONTRACT_ADDRESSES } from "@/utils/constants";
+import TradingBotManagerABI from "@/abi/TradingBotManager.json";
+import { useRouter } from "next/navigation";
 
 export default function CreateBot() {
   const [name, setName] = useState("");
@@ -14,9 +18,22 @@ export default function CreateBot() {
   
   const { isConnected, hasActiveSubscription } = useCryptoBot();
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
+
+  const { data: hash, writeContractAsync, isPending: isTxPending } = useWriteContract();
+  const { isLoading: isTxConfirming, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({ hash });
+
   useEffect(() => setMounted(true), []);
 
+  useEffect(() => {
+    if (isTxSuccess) {
+      const timer = setTimeout(() => router.push("/dashboard"), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isTxSuccess, router]);
+
   const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsUploading(true);
     setCid("");
 
@@ -34,12 +51,19 @@ export default function CreateBot() {
       const data = await response.json();
       if (data.IpfsHash) {
         setCid(data.IpfsHash);
+        
+        await writeContractAsync({
+          address: CONTRACT_ADDRESSES.TradingBotManager,
+          abi: TradingBotManagerABI,
+          functionName: "createBot",
+          args: [data.IpfsHash],
+        });
       } else {
         alert("Upload failed: " + (data.error || "Unknown Error"));
       }
     } catch (err) {
       console.error(err);
-      alert("Error occurred during upload");
+      alert("Error occurred during bot creation process.");
     } finally {
       setIsUploading(false);
     }
@@ -111,13 +135,19 @@ export default function CreateBot() {
 
         <button 
           type="submit" 
-          disabled={isUploading || !mounted || !isConnected || !hasActiveSubscription}
+          disabled={isUploading || isTxPending || isTxConfirming || isTxSuccess || !mounted || !isConnected || !hasActiveSubscription}
           className="mt-4 px-8 py-4 bg-primary text-primary-foreground font-bold rounded-xl hover:opacity-90 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed text-lg"
         >
           {isUploading ? (
             <><Loader2 className="w-5 h-5 animate-spin" /> Uploading to IPFS...</>
+          ) : isTxPending ? (
+            <><Loader2 className="w-5 h-5 animate-spin" /> Confirm in Wallet...</>
+          ) : isTxConfirming ? (
+            <><Loader2 className="w-5 h-5 animate-spin" /> Confirming Transaction...</>
+          ) : isTxSuccess ? (
+            <><CheckCircle className="w-5 h-5" /> Bot Created Successfully!</>
           ) : (
-            <><UploadCloud className="w-5 h-5" /> Save Metadata & Get CID <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>
+            <><UploadCloud className="w-5 h-5" /> Create Bot & Deploy <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>
           )}
         </button>
 
@@ -133,9 +163,16 @@ export default function CreateBot() {
             <p className="text-sm text-muted-foreground break-all">
               <strong>CID:</strong> {cid}
             </p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Next step: This CID will be passed to your `createBot()` smart contract transaction.
-            </p>
+            {hash && (
+              <p className="text-sm text-muted-foreground mt-2 break-all">
+                <strong>Transaction:</strong> {hash}
+              </p>
+            )}
+            {isTxSuccess && (
+              <p className="text-sm text-green-500 font-semibold mt-2">
+                Transaction confirmed. Redirecting to dashboard...
+              </p>
+            )}
           </div>
         )}
       </form>

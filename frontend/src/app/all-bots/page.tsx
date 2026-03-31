@@ -1,57 +1,93 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Bot, Activity, Calendar, Hash, ArrowUpRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, Bot, Activity, Calendar, Hash, ArrowUpRight, Loader2 } from "lucide-react";
+import { publicClient, CONTRACT_ADDRESSES } from "@/utils/constants";
+import TradingBotManagerABI from "@/abi/TradingBotManager.json";
 
-// Frontend mock data
-const MOCK_BOTS = [
-  {
-    id: "1",
-    name: "ETH Alpha Scalper",
-    config: "Mean Reversion",
-    creationDate: "2026-03-10",
-    performance: "+42.5%",
-    address: "0x7a2...b9f4",
-    status: "active"
-  },
-  {
-    id: "2",
-    name: "Arb Maestro",
-    config: "Arbitrage",
-    creationDate: "2026-02-15",
-    performance: "+18.2%",
-    address: "0x3f1...c2a1",
-    status: "active"
-  },
-  {
-    id: "3",
-    name: "BTC Trend Rider",
-    config: "Trend Following",
-    creationDate: "2026-03-01",
-    performance: "-4.1%",
-    address: "0x8e5...d110",
-    status: "paused"
-  },
-  {
-    id: "4",
-    name: "Sushi Rebalancer",
-    config: "Grid Trading",
-    creationDate: "2026-01-20",
-    performance: "+65.8%",
-    address: "0x9c4...e332",
-    status: "active"
-  }
-];
+interface GlobalBotData {
+  id: number;
+  name: string;
+  config: string;
+  creationDate: string;
+  performance: string;
+  address: string;
+  status: string;
+  cid: string;
+}
 
 export default function AllBotsPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [allBots, setAllBots] = useState<GlobalBotData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredBots = MOCK_BOTS.filter(bot => {
+  useEffect(() => {
+    async function fetchAllBots() {
+      setIsLoading(true);
+      try {
+        const botCount = await publicClient.readContract({
+          address: CONTRACT_ADDRESSES.TradingBotManager,
+          abi: TradingBotManagerABI,
+          functionName: "botCount",
+        }) as bigint;
+
+        const count = Number(botCount);
+        const promises = [];
+
+        for (let i = 0; i < count; i++) {
+          promises.push(
+            publicClient.readContract({
+              address: CONTRACT_ADDRESSES.TradingBotManager,
+              abi: TradingBotManagerABI,
+              functionName: "bots",
+              args: [BigInt(i)],
+            }).then(async (botInfo: any) => {
+              const [owner, configCid, balance, active] = botInfo;
+              let metadata = { name: `Bot #${i}`, strategy: "Unknown" };
+              if (configCid) {
+                try {
+                  const res = await fetch(`https://gateway.pinata.cloud/ipfs/${configCid}`);
+                  if (res.ok) {
+                    metadata = await res.json();
+                  }
+                } catch (e) {
+                  // ignore
+                }
+              }
+
+              return {
+                id: i,
+                name: metadata.name || `Bot #${i}`,
+                config: metadata.strategy || "Unknown Strategy",
+                creationDate: "Recently", 
+                performance: "0.0%",
+                address: owner,
+                status: active ? "active" : "paused",
+                cid: configCid
+              } as GlobalBotData;
+            })
+          );
+        }
+
+        const results = await Promise.all(promises);
+        setAllBots(results.reverse()); 
+      } catch (error) {
+        console.error("Failed to load global bots:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchAllBots();
+  }, []);
+
+  const filteredBots = allBots.filter(bot => {
     const term = searchTerm.toLowerCase();
     return (
       bot.address.toLowerCase().includes(term) ||
       bot.performance.toLowerCase().includes(term) ||
-      bot.name.toLowerCase().includes(term)
+      bot.name.toLowerCase().includes(term) ||
+      bot.config.toLowerCase().includes(term)
     );
   });
 
@@ -67,24 +103,31 @@ export default function AllBotsPage() {
       </header>
 
       {/* SEARCH BAR */}
-      <div className="w-full relative max-w-2xl mx-auto">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-muted-foreground" />
+      <div className="w-full relative max-w-2xl mx-auto flex gap-4 items-center">
+        <div className="relative flex-1">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search by bot name, wallet address, or performance..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-card border border-border rounded-2xl pl-12 pr-4 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-sm hover:shadow-md transition-all text-lg disabled:opacity-50"
+            disabled={isLoading}
+          />
         </div>
-        <input
-          type="text"
-          placeholder="Search by bot name, wallet address, or performance..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full bg-card border border-border rounded-2xl pl-12 pr-4 py-4 text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-sm hover:shadow-md transition-all text-lg"
-        />
       </div>
 
-      {/* BOT GRID */}
-      {filteredBots.length === 0 ? (
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center p-20 gap-4">
+          <Loader2 className="w-12 h-12 animate-spin text-primary" />
+          <span className="text-muted-foreground font-semibold animate-pulse">Loading all bots from the blockchain...</span>
+        </div>
+      ) : filteredBots.length === 0 ? (
         <div className="w-full py-20 flex flex-col items-center justify-center text-muted-foreground border border-dashed border-border rounded-2xl">
           <Bot className="w-16 h-16 opacity-30 mb-4" />
-          <p className="text-xl font-medium">No bots found matching your search.</p>
+          <p className="text-xl font-medium">No bots found {searchTerm ? 'matching your search' : ''}.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -93,7 +136,7 @@ export default function AllBotsPage() {
               
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-xl font-bold text-foreground">{bot.name}</h3>
+                  <h3 className="text-xl font-bold text-foreground truncate max-w-[200px]" title={bot.name}>{bot.name}</h3>
                   <p className="text-sm font-medium text-primary bg-primary/10 w-fit px-2 py-0.5 rounded-full mt-1">
                     {bot.config}
                   </p>
@@ -108,18 +151,19 @@ export default function AllBotsPage() {
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground flex items-center gap-1.5"><Hash className="w-4 h-4" /> Address</span>
-                  <span className="font-mono bg-muted px-2 py-0.5 rounded text-foreground text-xs flex items-center gap-1">
-                    {bot.address} <ArrowUpRight className="w-3 h-3" />
+                  <span className="font-mono bg-muted px-2 py-0.5 rounded text-foreground text-xs flex items-center gap-1" title={bot.address}>
+                    {bot.address.substring(0, 6)}...{bot.address.substring(bot.address.length - 4)}
+                    <a href={`https://sepolia.arbiscan.io/address/${bot.address}`} target="_blank" rel="noreferrer" className="hover:text-primary"><ArrowUpRight className="w-3 h-3" /></a>
                   </span>
                 </div>
               </div>
 
               <div className="mt-auto pt-4 border-t border-border flex items-center justify-between">
                 <span className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
-                  <Activity className="w-4 h-4" /> 30D Return
+                  <Activity className="w-4 h-4" /> Est. 30D Return
                 </span>
-                <span className={`text-xl font-extrabold ${bot.performance.startsWith('+') ? 'text-emerald-500' : 'text-rose-500'}`}>
-                  {bot.performance}
+                <span className={`text-xl font-extrabold ${bot.performance.startsWith('-') ? 'text-rose-500' : 'text-emerald-500'}`}>
+                  {bot.performance !== "0.0%" ? bot.performance : "N/A"}
                 </span>
               </div>
             </div>
