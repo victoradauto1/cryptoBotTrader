@@ -46,7 +46,7 @@ describe("TradeExecutor", function () {
     });
 
     // Cria e deposita em um bot para o 'user'
-    await botManager.connect(user).createBot(); // BotId 0
+    await botManager.connect(user).createBot("QmTestCid"); // BotId 0
     await botManager.connect(user).deposit(0, { value: depositAmount });
   });
 

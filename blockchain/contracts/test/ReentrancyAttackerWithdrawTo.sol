@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 interface ITradingBotManagerWithdrawTo {
-    function createBot() external returns (uint256);
+    function createBot(string calldata cid) external returns (uint256);
 
     function deposit(uint256 botId) external payable;
 
@@ -23,7 +23,7 @@ contract ReentrancyAttackerWithdrawTo {
     }
 
     function createBot() external payable {
-        botId = target.createBot();
+        botId = target.createBot("test_cid");
         target.deposit{value: msg.value}(botId);
     }
 

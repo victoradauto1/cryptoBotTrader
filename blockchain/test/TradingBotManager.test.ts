@@ -23,7 +23,7 @@ describe("TradingBotManager", function () {
 
   async function deployWithBotFixture() {
     const base = await deployWithExecutorFixture();
-    await base.contract.connect(base.user1).createBot();
+    await base.contract.connect(base.user1).createBot("QmTestCid");
     return base; // bot 0 belongs to user1
   }
 
@@ -175,20 +175,20 @@ describe("TradingBotManager", function () {
   describe("createBot", function () {
     it("creates a bot and increments botCount", async function () {
       const { contract, user1 } = await loadFixture(deployFixture);
-      await contract.connect(user1).createBot();
+      await contract.connect(user1).createBot("QmTestCid");
       expect(await contract.botCount()).to.equal(1);
     });
 
     it("assigns correct owner to bot", async function () {
       const { contract, user1 } = await loadFixture(deployFixture);
-      await contract.connect(user1).createBot();
+      await contract.connect(user1).createBot("QmTestCid");
       const bot = await contract.bots(0);
       expect(bot.owner).to.equal(user1.address);
     });
 
     it("creates bot as active with zero balance", async function () {
       const { contract, user1 } = await loadFixture(deployFixture);
-      await contract.connect(user1).createBot();
+      await contract.connect(user1).createBot("QmTestCid");
       const bot = await contract.bots(0);
       expect(bot.active).to.be.true;
       expect(bot.balance).to.equal(0);
@@ -196,14 +196,14 @@ describe("TradingBotManager", function () {
 
     it("emits BotCreated event", async function () {
       const { contract, user1 } = await loadFixture(deployFixture);
-      await expect(contract.connect(user1).createBot())
+      await expect(contract.connect(user1).createBot("QmTestCid"))
         .to.emit(contract, "BotCreated")
         .withArgs(0, user1.address);
     });
 
     it("tracks bot in userBots mapping", async function () {
       const { contract, user1 } = await loadFixture(deployFixture);
-      await contract.connect(user1).createBot();
+      await contract.connect(user1).createBot("QmTestCid");
       const bots = await contract.getUserBots(user1.address);
       expect(bots.length).to.equal(1);
       expect(bots[0]).to.equal(0);
@@ -211,8 +211,8 @@ describe("TradingBotManager", function () {
 
     it("multiple bots are tracked per user", async function () {
       const { contract, user1 } = await loadFixture(deployFixture);
-      await contract.connect(user1).createBot();
-      await contract.connect(user1).createBot();
+      await contract.connect(user1).createBot("QmTestCid");
+      await contract.connect(user1).createBot("QmTestCid");
       const bots = await contract.getUserBots(user1.address);
       expect(bots.length).to.equal(2);
     });
@@ -221,7 +221,7 @@ describe("TradingBotManager", function () {
       const { contract, owner, user1 } = await loadFixture(deployFixture);
       await contract.connect(owner).pause();
       await expect(
-        contract.connect(user1).createBot()
+        contract.connect(user1).createBot("QmTestCid")
       ).to.be.revertedWithCustomError(contract, "ContractPaused");
     });
   });
@@ -650,7 +650,7 @@ describe("TradingBotManager", function () {
       // executor not set yet — deploy fresh without executor
       const TradingBotManager = await ethers.getContractFactory("TradingBotManager");
       const c2 = await TradingBotManager.deploy();
-      await c2.connect(user1).createBot();
+      await c2.connect(user1).createBot("QmTestCid");
       await c2.connect(user1).deposit(0, { value: ethers.parseEther("1") });
       await expect(
         c2.connect(user1).debitBot(0, ethers.parseEther("0.1"))
@@ -776,16 +776,16 @@ describe("TradingBotManager", function () {
 
     it("returns correct bot IDs for a user", async function () {
       const { contract, user1 } = await loadFixture(deployFixture);
-      await contract.connect(user1).createBot(); // id 0
-      await contract.connect(user1).createBot(); // id 1
+      await contract.connect(user1).createBot("QmTestCid"); // id 0
+      await contract.connect(user1).createBot("QmTestCid"); // id 1
       const bots = await contract.getUserBots(user1.address);
       expect(bots.map(Number)).to.deep.equal([0, 1]);
     });
 
     it("does not mix bots from different users", async function () {
       const { contract, user1, user2 } = await loadFixture(deployFixture);
-      await contract.connect(user1).createBot(); // id 0
-      await contract.connect(user2).createBot(); // id 1
+      await contract.connect(user1).createBot("QmTestCid"); // id 0
+      await contract.connect(user2).createBot("QmTestCid"); // id 1
       const user1Bots = await contract.getUserBots(user1.address);
       const user2Bots = await contract.getUserBots(user2.address);
       expect(user1Bots.map(Number)).to.deep.equal([0]);

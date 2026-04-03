@@ -25,7 +25,7 @@ export default function Home() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">cryptocurrency trading.</span>
           </h2>
           <p className="text-muted-foreground text-lg md:text-xl leading-relaxed mt-2 max-w-xl">
-            Deploy invincible trading strategies directly to the blockchain. Non-custodial, fully decentralized, and blazing fast.
+            Non-custodial smart contract automation for simulated market trading.
           </p>
           
           <div className="flex flex-wrap items-center gap-4 mt-6">
