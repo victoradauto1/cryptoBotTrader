@@ -22,15 +22,15 @@ export default function Home() {
           </div>
           <h2 className="text-4xl md:text-6xl font-extrabold tracking-tighter text-foreground leading-[1.1]">
             Automate your <br className="hidden md:block" /> 
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">cryptocurrency trading.</span>
+            <span className="text-transparent bg-clip-text bg-linear-to-r from-primary to-accent">cryptocurrency trading.</span>
           </h2>
           <p className="text-muted-foreground text-lg md:text-xl leading-relaxed mt-2 max-w-xl">
             Non-custodial smart contract automation for simulated market trading.
           </p>
           
           <div className="flex flex-wrap items-center gap-4 mt-6">
-            <Link href="/create" className="px-8 py-4 bg-gradient-to-r from-primary to-pink-600 text-white font-bold rounded-xl hover:scale-105 transition-transform shadow-[0_4px_20px_rgba(250,82,160,0.4)] flex items-center gap-2 text-lg group cursor-pointer">
-              Create New Bot <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            <Link href="/create" className="px-8 py-4 bg-linear-to-r from-primary to-pink-600 text-white font-bold rounded-xl hover:scale-105 transition-transform shadow-[0_4px_20px_rgba(250,82,160,0.4)] flex items-center gap-2 text-lg group cursor-pointer">
+              Create New Bot 
             </Link>
             <Link href="/dashboard" className="px-8 py-4 glass-panel border border-border text-foreground font-bold rounded-xl hover:bg-muted transition-all text-lg shadow-sm cursor-pointer">
               View Analytics
@@ -74,7 +74,7 @@ export default function Home() {
             ))}
           </div>
           <Link href="/dashboard" className="text-sm text-center text-primary mt-2 hover:underline font-semibold block cursor-pointer">
-            View full rankings &rarr;
+            View full rankings
           </Link>
         </div>
       </section>
