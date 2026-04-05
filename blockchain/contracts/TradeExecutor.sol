@@ -25,6 +25,8 @@ contract TradeExecutor is Ownable {
     error ZeroAddress();
     error InvalidPrice();
     error InsufficientExecutorBalance();
+    error InsufficientBalance();
+    error TransferFailed();
 
     constructor(
         address _botManager,
@@ -105,7 +107,9 @@ contract TradeExecutor is Ownable {
      * @dev Allows the Owner to withdraw liquidity from the executor pool if necessary.
      */
     function withdrawLiquidity(uint256 amount) external onlyOwner {
-        require(address(this).balance >= amount, "Insufficient balance");
-        payable(owner()).transfer(amount);
+        if (address(this).balance < amount) revert InsufficientBalance();
+
+        (bool success, ) = payable(owner()).call{value: amount}("");
+        if (!success) revert TransferFailed();
     }
 }
